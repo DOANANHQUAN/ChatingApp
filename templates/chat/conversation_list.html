@@ -12,9 +12,12 @@
                     <a href="{% url 'accounts:friend_list' %}" class="icon-btn" title="Danh sách bạn bè">
                         <i class="bx bx-group" style="font-size: 20px;"></i>
                     </a>
-                    <a href="{% url 'accounts:logout' %}" class="icon-btn" title="Đăng xuất">
-                        <i class="bx bx-log-out" style="font-size: 20px;"></i>
-                    </a>
+                    <form action="{% url 'accounts:logout' %}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="icon-btn" title="Đăng xuất">
+                            <i class="bx bx-log-out" style="font-size: 20px;"></i>
+                        </button>
+                    </form>
                 </div>
             </div>
             
