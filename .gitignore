@@ -1,0 +1,7 @@
+# Bỏ qua tất cả mọi thứ theo mặc định để tránh push mã nguồn code lên GitHub
+*
+
+# Cho phép theo dõi và push các file tài liệu hướng dẫn và sơ đồ
+!README.md
+!django_messenger_skeleton.md
+!.gitignore
