@@ -1,7 +1,23 @@
-# Bỏ qua tất cả mọi thứ theo mặc định để tránh push mã nguồn code lên GitHub
-*
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-# Cho phép theo dõi và push các file tài liệu hướng dẫn và sơ đồ
-!README.md
-!django_messenger_skeleton.md
-!.gitignore
+# Database
+db.sqlite3
+db.sqlite3-journal
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Media files (các tệp do người dùng upload không nên đẩy lên git)
+media/attachments/
+media/avatars/
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp

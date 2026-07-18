@@ -1,0 +1,23 @@
+<div class="message-wrapper {% if msg.sender == user %}outgoing{% else %}incoming{% endif %}" data-message-id="{{ msg.id }}">
+    <div class="msg-bubble">
+        {% if msg.content %}
+            <div>{{ msg.content }}</div>
+        {% endif %}
+
+        {% if msg.attachments.exists %}
+            <div class="attachments-grid">
+                {% for attachment in msg.attachments.all %}
+                    {% if attachment.file_type == 'image' %}
+                        <img src="{{ attachment.file.url }}" alt="Attachment" class="attachment-img" onclick="window.open('{{ attachment.file.url }}', '_blank')">
+                    {% else %}
+                        <div class="attachment-file" onclick="window.open('{{ attachment.file.url }}', '_blank')">
+                            <i class="bx bx-file"></i>
+                            <span>{{ attachment.file.name|cut:"attachments/" }}</span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    <span class="msg-meta">{{ msg.created_at|date:"H:i - d/m/Y" }}</span>
+</div>

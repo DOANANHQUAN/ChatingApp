@@ -1,0 +1,64 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Messenger{% endblock %}</title>
+    <!-- Google Fonts & Boxicons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <!-- HTMX for smooth AJAX updates -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    
+    {% block content %}
+    {% endblock %}
+
+    <!-- Global Real-Time Notifications Script -->
+    {% if user.is_authenticated %}
+    <script>
+        const notificationSocket = new WebSocket(
+            (window.location.protocol === 'https:' ? 'wss://' : 'ws://')
+            + window.location.host
+            + '/ws/notifications/'
+        );
+
+        notificationSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === 'notification') {
+                // Show a toast or update unread count badge in UI
+                console.log("New notification received:", data);
+                
+                // Update unread notification count badge if present
+                const badge = document.getElementById('notification-badge');
+                if (badge) {
+                    let currentCount = parseInt(badge.innerText) || 0;
+                    badge.innerText = currentCount + 1;
+                    badge.style.display = 'flex';
+                }
+
+                // Show browser notification if permissions granted
+                if (Notification.permission === "granted") {
+                    new Notification(data.sender_username, {
+                        body: data.content,
+                        icon: '/static/images/logo.png'
+                    });
+                }
+            }
+        };
+
+        // Request notification permission
+        if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+    </script>
+    {% endif %}
+
+    {% block extra_js %}
+    {% endblock %}
+</body>
+</html>
