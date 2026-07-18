@@ -1,0 +1,276 @@
+{% extends "chat/conversation_list.html" %}
+{% block title %}
+    {% if conversation.is_group %}{{ conversation.title }}{% else %}{{ other_participant.first_name }} {{ other_participant.last_name }}{% endif %} - Messenger
+{% endblock %}
+
+{% block chat_window_content %}
+<div class="chat-window">
+    <!-- Chat Header -->
+    <div class="chat-header">
+        <div class="chat-header-info">
+            <div class="avatar-container" style="width: 42px; height: 42px;">
+                {% if conversation.is_group %}
+                    <img src="/static/images/default_group.png" alt="Group" class="avatar-img">
+                {% else %}
+                    <img src="{{ other_participant.avatar.url }}" alt="{{ other_participant.username }}" class="avatar-img">
+                    <span class="status-badge {% if other_participant.is_online %}online{% else %}offline{% endif %}"></span>
+                {% endif %}
+            </div>
+            <div>
+                <div class="chat-header-name">
+                    {% if conversation.is_group %}
+                        {{ conversation.title }}
+                    {% else %}
+                        {{ other_participant.first_name }} {{ other_participant.last_name }}
+                    {% endif %}
+                </div>
+                <div class="chat-header-status" id="header-status">
+                    {% if conversation.is_group %}
+                        {{ conversation.participants.count }} thành viên
+                    {% else %}
+                        {% if other_participant.is_online %}
+                            Đang hoạt động
+                        {% else %}
+                            Hoạt động {{ other_participant.last_seen|timesince }} trước
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="chat-header-actions">
+            <button class="icon-btn"><i class="bx bx-phone" style="font-size: 20px; color: var(--primary-color);"></i></button>
+            <button class="icon-btn"><i class="bx bx-video" style="font-size: 20px; color: var(--primary-color);"></i></button>
+            <button class="icon-btn"><i class="bx bx-info-circle" style="font-size: 20px; color: var(--primary-color);"></i></button>
+        </div>
+    </div>
+
+    <!-- Chat Messages Container -->
+    <div class="chat-messages-container" id="chat-messages">
+        {% for msg in messages_list %}
+            {% include "chat/partials/message_bubble.html" with msg=msg %}
+        {% endfor %}
+    </div>
+
+    <!-- Typing Indicator Area -->
+    <div id="typing-indicator-box" style="display: none; padding: 0 20px 8px 20px;">
+        <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+        <span style="font-size: 11px; color: var(--text-secondary); margin-left: 6px;" id="typing-user-text">đang nhập...</span>
+    </div>
+
+    <!-- Chat Input Area -->
+    <div class="chat-input-area">
+        <!-- Separate file input (hidden) to trigger via button -->
+        <input type="file" id="file-attachments" multiple style="display: none;" accept="image/*,video/*,application/*">
+        
+        <form id="message-form" class="chat-input-form" onsubmit="handleFormSubmit(event)">
+            <div class="chat-input-actions">
+                <button type="button" class="icon-btn" onclick="document.getElementById('file-attachments').click()">
+                    <i class="bx bx-plus-circle action-icon"></i>
+                </button>
+                <button type="button" class="icon-btn">
+                    <i class="bx bx-image action-icon"></i>
+                </button>
+                <button type="button" class="icon-btn">
+                    <i class="bx bx-happy-alt action-icon"></i>
+                </button>
+            </div>
+            
+            <input type="text" id="message-input" class="chat-text-input" placeholder="Nhập tin nhắn..." autocomplete="off">
+            
+            <div class="chat-input-actions">
+                <button type="submit" class="icon-btn" style="background-color: transparent;">
+                    <i class="bx bxs-send action-icon"></i>
+                </button>
+            </div>
+        </form>
+        <div id="selected-files-preview" style="display: flex; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--text-secondary);"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const conversationId = "{{ conversation.id }}";
+    const currentUserId = "{{ user.id }}";
+    const messagesContainer = document.getElementById("chat-messages");
+    const messageInput = document.getElementById("message-input");
+    const fileInput = document.getElementById("file-attachments");
+    const filesPreview = document.getElementById("selected-files-preview");
+    
+    // Scroll to bottom of chat
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    scrollToBottom();
+
+    // Establish WebSocket Connection
+    const chatSocket = new WebSocket(
+        (window.location.protocol === 'https:' ? 'wss://' : 'ws://')
+        + window.location.host
+        + '/ws/chat/'
+        + conversationId
+        + '/'
+    );
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        console.log("WebSocket event:", data);
+
+        if (data.type === 'message') {
+            // Append incoming or outgoing message
+            const isOutgoing = String(data.sender_id) === String(currentUserId);
+            const wrapper = document.createElement("div");
+            wrapper.className = `message-wrapper ${isOutgoing ? 'outgoing' : 'incoming'}`;
+            wrapper.dataset.messageId = data.message_id;
+
+            // Generate content
+            let attachmentsHtml = '';
+            if (data.attachments && data.attachments.length > 0) {
+                attachmentsHtml = '<div class="attachments-grid">';
+                data.attachments.forEach(file => {
+                    if (file.type === 'image') {
+                        attachmentsHtml += `<img src="${file.url}" alt="${file.name}" class="attachment-img">`;
+                    } else {
+                        attachmentsHtml += `<div class="attachment-file"><i class="bx bx-file"></i><span>${file.name}</span></div>`;
+                    }
+                });
+                attachmentsHtml += '</div>';
+            }
+
+            wrapper.innerHTML = `
+                <div class="msg-bubble">
+                    <div>${data.content || ''}</div>
+                    ${attachmentsHtml}
+                </div>
+                <span class="msg-meta">${data.created_at}</span>
+            `;
+
+            messagesContainer.appendChild(wrapper);
+            scrollToBottom();
+
+            // Send "seen" receipt if message is incoming
+            if (!isOutgoing) {
+                chatSocket.send(jsonStr({
+                    "type": "seen",
+                    "message_id": data.message_id
+                }));
+            }
+        }
+        else if (data.type === 'typing') {
+            const typingBox = document.getElementById("typing-indicator-box");
+            const typingText = document.getElementById("typing-user-text");
+            if (data.is_typing) {
+                typingText.innerText = `${data.sender_username} đang nhập...`;
+                typingBox.style.display = "block";
+                scrollToBottom();
+            } else {
+                typingBox.style.display = "none";
+            }
+        }
+        else if (data.type === 'seen') {
+            // Update seen receipt on UI if sender is watching
+            console.log(`Message ${data.message_id} seen by user ${data.user_id}`);
+            // Can render a small seen badge at the bottom of that specific message bubble
+        }
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+
+    // Helper to stringify JSON
+    function jsonStr(obj) {
+        return JSON.stringify(obj);
+    }
+
+    // Typing state tracking
+    let isTyping = false;
+    let typingTimeout;
+
+    messageInput.addEventListener("input", function() {
+        if (!isTyping) {
+            isTyping = true;
+            chatSocket.send(jsonStr({
+                "type": "typing",
+                "is_typing": true
+            }));
+        }
+
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            isTyping = false;
+            chatSocket.send(jsonStr({
+                "type": "typing",
+                "is_typing": false
+            }));
+        }, 3000); // Send stop typing after 3s of inactivity
+    });
+
+    // File selection change
+    fileInput.addEventListener("change", function() {
+        if (fileInput.files.length > 0) {
+            filesPreview.innerText = `Đã chọn ${fileInput.files.length} tệp đính kèm`;
+        } else {
+            filesPreview.innerText = "";
+        }
+    });
+
+    // Handle form submit
+    function handleFormSubmit(event) {
+        event.preventDefault();
+        const text = messageInput.value.trim();
+        const files = fileInput.files;
+
+        if (!text && files.length === 0) return;
+
+        // If files are present, send via HTTP POST (for attachment uploads)
+        if (files.length > 0) {
+            const formData = new FormData();
+            formData.append("content", text);
+            for (let i = 0; i < files.length; i++) {
+                formData.append("files", files[i]);
+            }
+            formData.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+
+            fetch(`/chat/${conversationId}/send/`, {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log("Upload Success:", data);
+                // Clear fields
+                messageInput.value = "";
+                fileInput.value = "";
+                filesPreview.innerText = "";
+                
+                // Clear typing indicator status
+                if (isTyping) {
+                    isTyping = false;
+                    chatSocket.send(jsonStr({"type": "typing", "is_typing": false}));
+                }
+            })
+            .catch(err => console.error("Upload Error:", err));
+        } else {
+            // Text only: Send direct over WebSocket (super fast)
+            chatSocket.send(jsonStr({
+                "type": "text_message",
+                "content": text
+            }));
+            messageInput.value = "";
+            
+            if (isTyping) {
+                isTyping = false;
+                chatSocket.send(jsonStr({"type": "typing", "is_typing": false}));
+            }
+        }
+    }
+</script>
+{% endblock %}
