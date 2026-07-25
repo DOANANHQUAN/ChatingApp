@@ -21,7 +21,11 @@
                     {% if conversation.is_group %}
                         {{ conversation.title }}
                     {% else %}
-                        {{ other_participant.first_name }} {{ other_participant.last_name }}
+                        {% if other_participant.first_name or other_participant.last_name %}
+                            {{ other_participant.first_name }} {{ other_participant.last_name }}
+                        {% else %}
+                            {{ other_participant.username }}
+                        {% endif %}
                     {% endif %}
                 </div>
                 <div class="chat-header-status" id="header-status">

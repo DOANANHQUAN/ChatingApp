@@ -10,6 +10,39 @@ from channels.layers import get_channel_layer
 from .models import Conversation, ConversationParticipant, Message, MessageAttachment, MessageStatus
 from accounts.models import User, Contact
 
+def get_hydrated_conversations(user):
+    """
+    Helper function to retrieve and format all conversations for the sidebar.
+    """
+    queryset = Conversation.objects.filter(participants__user=user).annotate(
+        latest_message_time=Max("messages__created_at")
+    ).order_by("-latest_message_time")
+    
+    hydrated_conversations = []
+    for conv in queryset:
+        other_participant = None
+        if not conv.is_group:
+            part = conv.participants.exclude(user=user).first()
+            if part:
+                other_participant = part.user
+        
+        unread_count = MessageStatus.objects.filter(
+            message__conversation=conv,
+            user=user,
+            is_read=False
+        ).count()
+        
+        latest_msg = conv.messages.all().order_by("-created_at").first()
+
+        hydrated_conversations.append({
+            "instance": conv,
+            "other_participant": other_participant,
+            "unread_count": unread_count,
+            "latest_message": latest_msg
+        })
+    return hydrated_conversations
+
+
 class ConversationListView(LoginRequiredMixin, ListView):
     """
     CBV to display the active chat conversations list.
@@ -21,51 +54,15 @@ class ConversationListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         user = self.request.user
-        
-        # Get all conversations the user is a participant of
-        queryset = Conversation.objects.filter(participants__user=user)
-        
-        # Annotate each conversation with the latest message creation time
-        queryset = queryset.annotate(
+        return Conversation.objects.filter(participants__user=user).annotate(
             latest_message_time=Max("messages__created_at")
         ).order_by("-latest_message_time")
-        
-        return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         
-        # Hydrate conversations with participant info and unread count
-        hydrated_conversations = []
-        for conv in context["conversations"]:
-            # Find the other participant if 1-1
-            other_participant = None
-            if not conv.is_group:
-                part = conv.participants.exclude(user=user).first()
-                if part:
-                    other_participant = part.user
-            
-            # Count unread messages for current user in this conversation
-            unread_count = MessageStatus.objects.filter(
-                message__conversation=conv,
-                user=user,
-                is_read=False
-            ).count()
-            
-            # Get latest message
-            latest_msg = conv.messages.all().order_by("-created_at").first()
-
-            hydrated_conversations.append({
-                "instance": conv,
-                "other_participant": other_participant,
-                "unread_count": unread_count,
-                "latest_message": latest_msg
-            })
-            
-        context["hydrated_conversations"] = hydrated_conversations
-        
-        # List of friends to start a new chat with
+        context["hydrated_conversations"] = get_hydrated_conversations(user)
         context["contacts"] = Contact.objects.filter(
             Q(user1=user) | Q(user2=user)
         )
@@ -109,6 +106,13 @@ class ConversationDetailView(LoginRequiredMixin, DetailView):
             part = conv.participants.exclude(user=user).first()
             if part:
                 context["other_participant"] = part.user
+
+        # Provide sidebar data for inherited layout
+        context["hydrated_conversations"] = get_hydrated_conversations(user)
+        context["active_conversation_id"] = conv.id
+        context["contacts"] = Contact.objects.filter(
+            Q(user1=user) | Q(user2=user)
+        )
                 
         return context
 

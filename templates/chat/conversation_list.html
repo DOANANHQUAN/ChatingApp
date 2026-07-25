@@ -50,9 +50,12 @@
                                 <span class="conv-name">
                                     {% if conv.instance.is_group %}
                                         {{ conv.instance.title }}
-                                    </span>
                                     {% else %}
-                                        {{ conv.other_participant.first_name }} {{ conv.other_participant.last_name }}
+                                        {% if conv.other_participant.first_name or conv.other_participant.last_name %}
+                                            {{ conv.other_participant.first_name }} {{ conv.other_participant.last_name }}
+                                        {% else %}
+                                            {{ conv.other_participant.username }}
+                                        {% endif %}
                                     {% endif %}
                                 </span>
                                 <span class="conv-time">
