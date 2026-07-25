@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, View
-from django.contrib.auth import login
+from django.contrib.auth import login, logout as auth_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView as DjangoLoginView, LogoutView as DjangoLogoutView
 from django.db.models import Q
@@ -34,9 +34,15 @@ class LoginView(DjangoLoginView):
 
 class LogoutView(DjangoLogoutView):
     """
-    Standard Django logout view.
+    Standard Django logout view. Handles both GET and POST requests.
     """
+    http_method_names = ["get", "post", "options"]
     next_page = reverse_lazy("accounts:login")
+
+    def get(self, request, *args, **kwargs):
+        auth_logout(request)
+        return redirect(self.next_page)
+
 
 
 class FriendListView(LoginRequiredMixin, ListView):
